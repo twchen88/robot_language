@@ -1,0 +1,141 @@
+from cozmo_fsm import *
+
+from bs4 import BeautifulSoup as bs
+import requests as rq
+
+from datetime import datetime, timedelta, date
+from cal_setup import get_calendar_service
+import string
+
+from googletrans import Translator
+from pypinyin import lazy_pinyin
+
+import matplotlib.pyplot as plt
+
+Screenshot_num = 1
+
+class Final(StateMachineProgram):
+    def __init__(self):
+        super().__init__(speech=True, speech_debug=True)
+
+    def user_image(self, image, gray):
+        self.robot.myimage = gray
+
+    class Grab(PickUpCube):
+        def start(self,event=None):
+            obj = event.result.groups()[0]
+            obj_dict = dict()
+            obj_dict["方块一"] = "cube1"
+            obj_dict["方块二"] = "cube2"
+            obj_dict["方块三"] = "cube3"
+            cube = obj_dict[obj]
+            if cube == 'cube1' and cube1.is_visible:
+                print("Picking up cube1")
+                self.object = cube1
+            elif cube == 'cube2' and cube2.is_visible:
+                print("Picking up cube2")
+                self.object = cube2
+            elif cube == 'cube3' and cube3.is_visible:
+                print("Picking up cube3")
+                self.object = cube3
+            else:
+                print("Nothing to pick up.")
+            super().start(event)
+                            
+
+    class Weather(Say):
+        def start(self,event):
+            soup = bs(rq.get("https://weather.com/weather/tenday/l/Pittsburgh+PA").content, "html.parser")
+            weather = self.getWeather(soup)
+            temp = self.getTemp(soup)
+            self.text = 'It is %s with a temperature of %s' % (weather, temp)
+            super().start(event)
+        
+        def getWeather(self, soup):
+            html = soup.find("div", class_="DailyContent--Condition--bQKA2")
+            res = str(html.svg.title)[7:-8]
+            return res
+        
+        def getTemp(self, soup):
+            return soup.find("span", class_="DailyContent--temp--3d4dn").text
+
+    class Calendar(Say):
+        def start(self,event):
+            service = get_calendar_service()
+
+            hour = event.result.groups()[0]
+            translator = Translator()
+            translation = translator.translate(hour, dest='en').text
+
+            if translation.isdigit():
+                begin = datetime.now()+timedelta(hours=int(translation))
+                start = begin.isoformat()
+                startTime = begin.time().replace(second=0, microsecond=0)
+                x = begin.date()
+                startDate = date(day=x.day, month=x.month, year=x.year).strftime('%A %d %B %Y')
+                end = (begin + timedelta(hours=1)).isoformat()
+                endTime = (begin + timedelta(hours=1)).time().replace(second=0, microsecond=0)
+
+                event_result = service.events().insert(calendarId='primary',
+                    body={
+                        "summary": 'Take Cozmo on a walk',
+                        "description": 'Cozmo calendar automation',
+                        "start": {"dateTime": start, "timeZone": 'America/New_York'},
+                        "end": {"dateTime": end, "timeZone": 'America/New_York'},
+                    }
+                ).execute()
+
+                self.text = 'created event %s. starts on %s at %s. ends at %s.' % \
+                            (event_result['summary'], startDate, startTime, endTime)
+            else:
+                self.text = 'that is not a valid number.'
+            
+            super().start(event)
+
+    class Repeat(Say):
+        def start(self,event):
+            text = event.result.groups()[0]
+            say = lazy_pinyin(text)
+            self.text = " ".join(say)
+            super().start(event)
+            
+    class Translate(Say):
+        def start(self, event):
+            text = event.result.groups()[0]
+            translator = Translator()
+            translation = translator.translate(text, dest='en').text
+            self.text = "It means %s" % (translation)
+            super().start(event)
+
+    class Picture(Say):
+        def start(self,event):
+            global Screenshot_num 
+            fname = "test" + str(Screenshot_num) + ".png"
+            plt.imshow(self.robot.myimage, cmap=plt.gray())
+            plt.imsave(fname, self.robot.myimage)
+            self.text = "saved to %s" % (fname)
+            Screenshot_num += 1
+            super().start(event)
+
+    class Error(Say):
+        def start(self,event):
+            self.text = 'shuhmah? Sorry I still need to learn what that means.'
+            super().start(event)
+
+    $setup{
+        loop: Say('jeh shah laino')
+        # grabbing cubes
+        loop =Hear('(方块一|方块二|方块三)')=> self.Grab() =C=> loop
+        # webscrape weather
+        loop =Hear('(天气)')=> self.Weather() =C=> loop
+        # google calendar
+        loop =Hear('(行事历)')=> Say("hao. how many hours from now?") =Hear('(.*)')=> self.Calendar() =C=> loop
+        # repeat/echo
+        loop =Hear('(重复)')=> Say("hao. repeat what?") =Hear('(.*)')=> self.Repeat() =C=> loop
+        # translate
+        loop =Hear('(翻译)')=> Say("hao. translate what?") =Hear('(.*)')=> self.Translate() =C=> loop
+        # take a picture
+        loop =Hear('(拍照)')=> self.Picture() =C=> loop
+        # say I still need to know what that means
+        loop =Hear('()')=> self.Error() =C=> loop
+    }

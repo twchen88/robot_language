@@ -1,0 +1,43 @@
+Instructions:
+
+To set up:
+	1. Install all requirements with pip3 in requirements.txt
+	2. Replace speech.py and pickup.py in the cozmo_tools/cozmo_fsm folder with the new 
+	   speech.py and pickup.py provided
+	3. Everything else downloaded should be in the same directory as Final.fsm and cozmo_tools 
+	   should be in the same directory as Final.fsm
+
+To run:
+	1. genfsm Final.fsm
+	2. simple_cli
+	3. runfsm('Final')
+	4. Wait for Cozmo to ask you to say something saying "jeh shah laino" and for 
+	   "Listening..." to pop up in the terminal 
+		This may take some time due to the import of our Chinese NLP segmentation module
+	5. Say one of the following supported commands:
+		方块一 (grab cube 1)
+		方块二 (grab cube 2)
+		方块三 (grab cube 3)
+		天气 (get the weather)
+		行事历 (create a Google calendar event)
+			Note: To use this with your Google Calendar, 
+			      you need to follow steps 1 and 2 here:
+			      https://karenapp.io/articles/how-to-automate-google-calendar-with-python-using-the-calendar-api/
+			      You will also need to remove the existing version of token.pickle so 
+			      that a new one can be generated using cal_setup.py after following 
+                              steps 1 and 2 and before running runfsm
+		重复 (repeat what you say)
+		翻译 (translate)
+		拍照 (take a picture)
+
+	   *Note: anything else will produce an error message since Cozmo is still learning 
+                  Mandarin :)
+	6. Run as many times as you like, but wait for him to prompt you for a new command with 
+           "jeh shah laino"
+	7. Ctrl + "\" to end the program
+
+
+
+
+
+
